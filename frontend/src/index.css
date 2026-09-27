@@ -1,0 +1,184 @@
+/* ══════════════════════════════════════════════════════════════════
+   VoiceForm AI — Design System & Global Styles
+   ══════════════════════════════════════════════════════════════════ */
+
+:root {
+  --bg-primary:      #08081a;
+  --bg-secondary:    #0f0f2d;
+  --bg-card:         #15153e;
+  --bg-card-hover:   #1b1b4d;
+  --bg-glass:        rgba(21, 21, 62, 0.65);
+  --bg-glass-heavy:  rgba(15, 15, 45, 0.85);
+
+  --accent:          #00d4aa;
+  --accent-hover:    #00be97;
+  --accent-light:    rgba(0, 212, 170, 0.12);
+  --accent-glow:     rgba(0, 212, 170, 0.35);
+
+  --text-primary:    #f5f5ff;
+  --text-secondary:  #a6a6d2;
+  --text-muted:      #6a6a9e;
+
+  --danger:          #ff4d6d;
+  --danger-light:    rgba(255, 77, 109, 0.15);
+  --warning:         #fbbf24;
+  --warning-light:   rgba(251, 191, 36, 0.15);
+  --success:         #00d4aa;
+  --success-light:   rgba(0, 212, 170, 0.15);
+  --info:            #38bdf8;
+
+  --border-light:    rgba(255, 255, 255, 0.08);
+  --border-hover:    rgba(0, 212, 170, 0.3);
+
+  --radius-xs:       6px;
+  --radius-sm:       10px;
+  --radius-md:       16px;
+  --radius-lg:       24px;
+  --radius-xl:       36px;
+  --radius-full:     9999px;
+
+  --shadow-sm:       0 2px 10px rgba(0, 0, 0, 0.35);
+  --shadow-md:       0 8px 30px rgba(0, 0, 0, 0.45);
+  --shadow-lg:       0 20px 60px rgba(0, 0, 0, 0.6);
+  --shadow-glow:     0 0 25px rgba(0, 212, 170, 0.3);
+
+  --transition-fast: 0.15s ease;
+  --transition-norm: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* ── Ambient Radial Lighting Background ────────────────────────── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 65% 50% at 15% 15%, rgba(0, 212, 170, 0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 60% at 85% 85%, rgba(99, 102, 241, 0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 50% 50%, rgba(168, 85, 247, 0.04) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Typography & Helpers ──────────────────────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-primary);
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  transition: var(--transition-fast);
+}
+
+a:hover {
+  color: var(--accent-hover);
+}
+
+button {
+  font-family: inherit;
+  border: none;
+  outline: none;
+  background: transparent;
+}
+
+/* ── Scrollbars ────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 212, 170, 0.4);
+}
+
+/* ── Print Stylesheet ─────────────────────────────────────────── */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #111111 !important;
+  }
+
+  body::before,
+  .navbar-root,
+  .app-footer,
+  .toast-container,
+  .loading-backdrop,
+  .review-actions-toolbar,
+  .edit-field-btn,
+  .return-wizard-link {
+    display: none !important;
+  }
+
+  .main-content-area {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .review-celebration-card,
+  .review-stats-grid,
+  .review-table-card {
+    background: #ffffff !important;
+    border: 1px solid #dddddd !important;
+    color: #111111 !important;
+    box-shadow: none !important;
+  }
+
+  .celebration-title,
+  .table-card-title,
+  .stat-card-value {
+    color: #111111 !important;
+  }
+
+  .review-data-table th {
+    background: #f3f4f6 !important;
+    color: #111111 !important;
+    border-bottom: 2px solid #333333 !important;
+  }
+
+  .review-data-table td {
+    color: #222222 !important;
+    border-bottom: 1px solid #eeeeee !important;
+  }
+
+  .badge-ans-yes {
+    background: #dcfce7 !important;
+    color: #15803d !important;
+  }
+
+  .badge-ans-no {
+    background: #fee2e2 !important;
+    color: #b91c1c !important;
+  }
+}

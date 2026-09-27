@@ -27,9 +27,9 @@ app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ── Serve frontend statically ──────────────────────────────────
-const staticDir = fs.existsSync(path.join(__dirname, '../public'))
-  ? path.join(__dirname, '../public')
-  : path.join(__dirname, '../frontend');
+const distDir = path.join(__dirname, '../frontend/dist');
+const publicDir = path.join(__dirname, '../public');
+const staticDir = fs.existsSync(distDir) ? distDir : publicDir;
 app.use(express.static(staticDir));
 
 // ── API Routes ─────────────────────────────────────────────────

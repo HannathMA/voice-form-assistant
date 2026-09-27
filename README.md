@@ -33,16 +33,24 @@ Edit `.env` and fill in your keys:
 | `SARVAM_API_KEY` | [Sarvam AI Dashboard](https://dashboard.sarvam.ai) |
 | `MONGODB_URI` | Local: `mongodb://localhost:27017/voice-form-assistant` |
 
-### 5. Start the server
+### 5. Start development servers
 ```bash
-npm start          # production
-npm run dev        # development (auto-restart with nodemon)
+# Terminal 1: Start backend server (port 5000)
+npm run dev:backend
+
+# Terminal 2: Start React frontend Vite dev server (port 5173)
+npm run dev:frontend
+```
+
+Or build the production React bundle into `frontend/dist` and `public`:
+```bash
+npm run build
+npm start
 ```
 
 ### 6. Open in browser
-```
-http://localhost:5000
-```
+- **React Development**: `http://localhost:5173`
+- **Backend / Production**: `http://localhost:5000`
 
 ---
 
@@ -50,33 +58,28 @@ http://localhost:5000
 
 ```
 voice-form-assistant/
-├── frontend/                  ← Static HTML/CSS/JS (served by Express)
-│   ├── index.html             ← Home: language selection
-│   ├── dashboard.html         ← Upload form
-│   ├── form.html              ← Voice-guided form filling
-│   ├── progress.html          ← Review & export
-│   ├── css/
-│   │   ├── style.css          ← Global design system
-│   │   └── form.css           ← Form-page styles
-│   └── js/
-│       ├── api.js             ← All API calls (shared)
-│       ├── main.js            ← Home page logic
-│       ├── upload.js          ← Upload page logic
-│       ├── form.js            ← Form filling wizard
-│       ├── voice.js           ← TTS + STT module
-│       └── progress.js        ← Review page logic
+├── frontend/                  ← Modern React SPA (Vite + React 19)
+│   ├── src/
+│   │   ├── components/        ← Navbar, HomeView, UploadView, FormWizardView, ReviewView, etc.
+│   │   ├── context/           ← AppContext (state management for language, session, toasts)
+│   │   ├── services/          ← api.js (backend fetch) & voice.js (TTS/STT dual-layer)
+│   │   ├── i18n/              ← translations.js (en, ml, hi, ta, te)
+│   │   ├── App.jsx & App.css  ← View orchestrator & styling
+│   │   └── main.jsx & index.css ← Entry point & global tokens
+│   ├── dist/                  ← Production React bundle
+│   └── package.json           ← React dependencies & Vite config
 │
-└── backend/
-    ├── server.js              ← Express entry point
-    ├── config/db.js           ← MongoDB connection
-    ├── models/                ← Mongoose models (User, Form, Session)
-    ├── routes/                ← API routes
-    ├── controllers/           ← Route handlers
-    ├── services/
-    │   ├── geminiService.js   ← Gemini Vision API
-    │   └── sarvamService.js   ← Sarvam TTS + STT
-    └── middleware/
-        └── uploadMiddleware.js ← Multer (image + audio)
+├── public/                    ← Static production distribution
+├── backend/
+│   ├── server.js              ← Express entry point (serves API & frontend/dist)
+│   ├── config/db.js           ← MongoDB connection
+│   ├── models/                ← Mongoose models (User, Form, Session)
+│   ├── routes/                ← API routes (/api/forms, /api/sessions, /api/voice)
+│   ├── controllers/           ← Route handlers
+│   │   ├── geminiService.js   ← Gemini Vision API
+│   │   └── sarvamService.js   ← Sarvam TTS + STT
+│   └── middleware/
+│       └── uploadMiddleware.js ← Multer (image + audio)
 ```
 
 ---
