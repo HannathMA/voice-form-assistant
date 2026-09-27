@@ -13,23 +13,35 @@ function isGeminiKeyValid(key) {
  * @param {string} [customKey] - Optional custom Gemini API key passed from request
  * @returns {Promise<{formTitle: string, fields: Array}>}
  */
-const detectFormFields = async (imagePath, language = 'en', customKey = null) => {
+const detectFormFields = async (imageInput, language = 'en', customKey = null) => {
   const activeKey = (customKey || process.env.GEMINI_API_KEY || '').trim();
 
   if (!isGeminiKeyValid(activeKey)) {
     throw new Error(
-      'Gemini API key is not configured. Please provide your Google Gemini API key in backend/.env or in the dashboard to detect form fields using AI.'
+      'Gemini API key is not configured in environment variables (GEMINI_API_KEY).'
     );
   }
 
   const genAI = new GoogleGenerativeAI(activeKey);
 
-  // Read image and convert to base64
-  const imageData = fs.readFileSync(imagePath);
-  const base64Image = imageData.toString('base64');
-  const mimeType = imagePath.match(/\.(png|gif|webp)$/i)
-    ? `image/${imagePath.split('.').pop().toLowerCase()}`
-    : 'image/jpeg';
+  // Convert image to base64
+  let base64Image;
+  let mimeType = 'image/jpeg';
+
+  if (imageInput && imageInput.buffer) {
+    base64Image = imageInput.buffer.toString('base64');
+    mimeType = imageInput.mimetype || 'image/jpeg';
+  } else if (Buffer.isBuffer(imageInput)) {
+    base64Image = imageInput.toString('base64');
+  } else if (typeof imageInput === 'string' && fs.existsSync(imageInput)) {
+    const imageData = fs.readFileSync(imageInput);
+    base64Image = imageData.toString('base64');
+    mimeType = imageInput.match(/\.(png|gif|webp)$/i)
+      ? `image/${imageInput.split('.').pop().toLowerCase()}`
+      : 'image/jpeg';
+  } else {
+    throw new Error('No valid image data was provided for AI detection.');
+  }
 
   const prompt = `You are an expert AI form digitizer and OCR assistant.
 Carefully examine the attached form image. Extract all detectable fields and return ONLY a valid JSON object (no markdown formatting, no code fences, no explanations).

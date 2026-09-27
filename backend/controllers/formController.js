@@ -24,13 +24,12 @@ const uploadAndDetect = async (req, res) => {
     const apiKey = (req.headers['x-gemini-key'] || geminiApiKey || process.env.GEMINI_API_KEY || '').trim();
 
     // 1. Detect fields using Gemini Vision API
-    const geminiResult = await detectFormFields(req.file.path, currentLang, apiKey);
+    const geminiResult = await detectFormFields(req.file, currentLang, apiKey);
 
     // 2. Relative image path
-    const relativePath = path.relative(
-      path.join(__dirname, '../'),
-      req.file.path
-    ).replace(/\\/g, '/');
+    const relativePath = req.file.path
+      ? path.relative(path.join(__dirname, '../'), req.file.path).replace(/\\/g, '/')
+      : 'uploads/' + (req.file.originalname || 'form.png');
 
     // 3. Persist form & user preference (DB or in-memory)
     let savedForm;
