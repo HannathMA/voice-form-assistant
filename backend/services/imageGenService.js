@@ -93,27 +93,32 @@ async function generateFormImage({ template = 'bank_kyc', prompt = '', customKey
     throw new Error('OpenAI did not return image data');
   }
 
-  // Ensure uploads directory exists
+  // Ensure uploads directory exists (if filesystem is writable)
   const uploadsDir = path.join(__dirname, '../uploads');
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
+  let relativeUrl = null;
+  const filename = `generated-form-${Date.now()}.png`;
+
+  try {
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+    const filePath = path.join(uploadsDir, filename);
+    const imageBuffer = Buffer.from(b64, 'base64');
+    fs.writeFileSync(filePath, imageBuffer);
+    relativeUrl = `/uploads/${filename}`;
+  } catch (fsErr) {
+    console.warn('Local file write skipped (read-only environment):', fsErr.message);
   }
 
-  const filename = `generated-form-${Date.now()}.png`;
-  const filePath = path.join(uploadsDir, filename);
-  const imageBuffer = Buffer.from(b64, 'base64');
-  fs.writeFileSync(filePath, imageBuffer);
-
-  const relativeUrl = `/uploads/${filename}`;
   const dataUrl = `data:image/png;base64,${b64}`;
 
   return {
     success: true,
     filename,
     relativeUrl,
-    imageUrl: relativeUrl,
+    imageUrl: relativeUrl || dataUrl,
     dataUrl,
-    sizeBytes: imageBuffer.length,
+    sizeBytes: Buffer.from(b64, 'base64').length,
     prompt: finalPrompt,
   };
 }
@@ -200,9 +205,20 @@ async function generateFilledFormImage({ formTitle = 'Official Application Form'
       });
 
       const editData = await editResponse.json();
-      if (editResponse.ok && editData.data?.[0]?.b64_json) {
-        b64 = editData.data[0].b64_json;
-        console.log('✅ OpenAI images/edits successfully filled the exact uploaded form!');
+      if (editResponse.ok) {
+        if (editData.data?.[0]?.b64_json) {
+          b64 = editData.data[0].b64_json;
+          console.log('✅ OpenAI images/edits successfully filled the exact uploaded form!');
+        } else if (editData.data?.[0]?.url) {
+          try {
+            const imgRes = await fetch(editData.data[0].url);
+            const arrayBuf = await imgRes.arrayBuffer();
+            b64 = Buffer.from(arrayBuf).toString('base64');
+            console.log('✅ OpenAI images/edits returned URL, downloaded and converted to base64!');
+          } catch (urlErr) {
+            console.warn('Could not fetch OpenAI image from url:', urlErr.message);
+          }
+        }
       } else {
         console.warn('⚠️ OpenAI images/edits returned non-200, falling back to generation:', editData.error?.message || editResponse.status);
       }
@@ -234,7 +250,17 @@ async function generateFilledFormImage({ formTitle = 'Official Application Form'
       throw new Error(data.error?.message || `OpenAI Image Generation error (${response.status})`);
     }
 
-    b64 = data.data?.[0]?.b64_json;
+    if (data.data?.[0]?.b64_json) {
+      b64 = data.data[0].b64_json;
+    } else if (data.data?.[0]?.url) {
+      try {
+        const imgRes = await fetch(data.data[0].url);
+        const arrayBuf = await imgRes.arrayBuffer();
+        b64 = Buffer.from(arrayBuf).toString('base64');
+      } catch (urlErr) {
+        console.warn('Could not fetch OpenAI image generation url:', urlErr.message);
+      }
+    }
   }
 
   if (!b64) {
@@ -242,23 +268,29 @@ async function generateFilledFormImage({ formTitle = 'Official Application Form'
   }
 
   const filename = `filled-form-${Date.now()}.png`;
-  const filePath = path.join(uploadsDir, filename);
-  const imageBuffer = Buffer.from(b64, 'base64');
-  fs.writeFileSync(filePath, imageBuffer);
+  let relativeUrl = null;
 
-  const relativeUrl = `/uploads/${filename}`;
+  try {
+    const filePath = path.join(uploadsDir, filename);
+    const imageBuffer = Buffer.from(b64, 'base64');
+    fs.writeFileSync(filePath, imageBuffer);
+    relativeUrl = `/uploads/${filename}`;
+  } catch (fsErr) {
+    console.warn('Local file write skipped (read-only environment):', fsErr.message);
+  }
+
   const dataUrl = `data:image/png;base64,${b64}`;
 
   return {
     success: true,
     filename,
     relativeUrl,
-    imageUrl: relativeUrl,
+    imageUrl: relativeUrl || dataUrl,
     dataUrl,
-    sizeBytes: imageBuffer.length,
+    sizeBytes: Buffer.from(b64, 'base64').length,
     formTitle,
     entriesCount: entries.length,
-    isExactFormEdit: Boolean(imagePath && fs.existsSync(imagePath)),
+    isExactFormEdit: Boolean(fileBuffer),
   };
 }
 

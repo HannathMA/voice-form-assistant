@@ -39,6 +39,7 @@ export default function UploadView() {
   const [previewUrl, setPreviewUrl] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
+  const optimizedBase64Ref = useRef('');
 
   const handleFile = (file) => {
     if (!file) return;
@@ -55,14 +56,36 @@ export default function UploadView() {
     const objectUrl = URL.createObjectURL(file);
     setPreviewUrl(objectUrl);
 
-    // Read base64 data so it can be sent to OpenAI API on Vercel
-    const reader = new FileReader();
-    reader.onload = () => {
+    // Create an optimized, lightweight base64 so it can be passed safely to OpenAI API
+    const img = new Image();
+    img.onload = () => {
+      let width = img.naturalWidth || img.width;
+      let height = img.naturalHeight || img.height;
+      const maxDim = 1200;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      const b64 = canvas.toDataURL('image/png', 0.9);
+      optimizedBase64Ref.current = b64;
       try {
-        localStorage.setItem('vfa_form_base64', reader.result);
-      } catch {}
+        sessionStorage.setItem('vfa_form_base64', b64);
+        localStorage.setItem('vfa_form_base64', b64);
+      } catch (err) {
+        console.warn('Storage quota note:', err.message);
+      }
     };
-    reader.readAsDataURL(file);
+    img.src = objectUrl;
 
     showToast(t('imgSelected'), 'success');
   };
@@ -89,6 +112,11 @@ export default function UploadView() {
     setSelectedFile(null);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl('');
+    optimizedBase64Ref.current = '';
+    try {
+      sessionStorage.removeItem('vfa_form_base64');
+      localStorage.removeItem('vfa_form_base64');
+    } catch {}
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -104,12 +132,18 @@ export default function UploadView() {
 
       const result = await apiUploadForm(formData);
 
+      const base64Data =
+        optimizedBase64Ref.current ||
+        sessionStorage.getItem('vfa_form_base64') ||
+        localStorage.getItem('vfa_form_base64') ||
+        '';
+
       setForm({
         _id: result.formId,
         formTitle: result.formTitle,
         fields: result.fields,
         imageUrl: result.imageUrl,
-        imageDataUrl: localStorage.getItem('vfa_form_base64') || '',
+        imageDataUrl: base64Data,
       });
       setFormId(result.formId);
       localStorage.setItem('vfa_form_id', result.formId);

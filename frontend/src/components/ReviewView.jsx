@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import confetti from 'canvas-confetti';
-import { apiGenerateFilledForm } from '../services/api';
+import { apiGenerateFilledForm, apiGetConfig, apiSaveConfig } from '../services/api';
 import { generateExactFilledFormImage } from '../services/formOverlay';
 import {
   CheckCircle2,
@@ -20,7 +20,38 @@ import {
   FileCheck2,
   RotateCw,
   Zap,
+  Key,
 } from 'lucide-react';
+
+async function getOptimizedBase64(srcOrBase64) {
+  if (!srcOrBase64) return '';
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      let width = img.naturalWidth || img.width;
+      let height = img.naturalHeight || img.height;
+      const maxDim = 1200;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/png', 0.9));
+    };
+    img.onerror = () => resolve(srcOrBase64);
+    img.src = srcOrBase64;
+  });
+}
 
 export default function ReviewView() {
   const { form, answers, jumpToField, setActiveStep, resetForm, t, showToast } = useApp();
@@ -31,6 +62,22 @@ export default function ReviewView() {
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [isGeneratingInstant, setIsGeneratingInstant] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // OpenAI API Key management
+  const [apiKeyInput, setApiKeyInput] = useState(() => {
+    return typeof window !== 'undefined' ? (localStorage.getItem('vfa_openai_key') || '') : '';
+  });
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [openAiError, setOpenAiError] = useState(null);
+  const [hasServerKey, setHasServerKey] = useState(false);
+
+  useEffect(() => {
+    apiGetConfig()
+      .then((cfg) => {
+        if (cfg?.hasOpenAiKey) setHasServerKey(true);
+      })
+      .catch(() => {});
+  }, []);
 
   const autoFilledRef = useRef(false);
   const fields = form?.fields || [];
@@ -56,38 +103,71 @@ export default function ReviewView() {
     : 0;
 
   // Generate original filled form using OpenAI API
-  const handleGenerateWithOpenAI = useCallback(async () => {
+  const handleGenerateWithOpenAI = useCallback(async (keyOverride) => {
     setIsGeneratingAi(true);
+    setOpenAiError(null);
     try {
       showToast('Generating filled form with OpenAI using your uploaded form…', 'info');
+      const rawImg =
+        form?.imageDataUrl ||
+        sessionStorage.getItem('vfa_form_base64') ||
+        localStorage.getItem('vfa_form_base64') ||
+        form?.imageUrl ||
+        localStorage.getItem('vfa_form_img') ||
+        '';
+      const optimizedBase64 = await getOptimizedBase64(rawImg);
       const imgSrc = form?.imageUrl || localStorage.getItem('vfa_form_img') || '';
-      const base64 = form?.imageDataUrl || localStorage.getItem('vfa_form_base64') || '';
+
+      const activeKey =
+        (typeof keyOverride === 'string' ? keyOverride : apiKeyInput) ||
+        localStorage.getItem('vfa_openai_key') ||
+        '';
 
       const result = await apiGenerateFilledForm({
         formTitle: form?.formTitle || 'Official Form',
         answers,
         fields,
         imageUrl: imgSrc,
-        imageBase64: base64,
+        imageBase64: optimizedBase64,
         formId: form?._id || '',
+        customKey: activeKey,
       });
 
       if (result && (result.dataUrl || result.imageUrl)) {
         setAiImage(result);
         setActiveMode('openai');
+        setOpenAiError(null);
         showToast('✨ Original filled form generated with OpenAI!', 'success');
       } else {
         throw new Error('No image returned by OpenAI');
       }
     } catch (err) {
       console.error('OpenAI filled form error:', err);
+      setOpenAiError(err.message || 'OpenAI generation failed');
       showToast(err.message || 'OpenAI generation failed. Switching to instant view…', 'error');
       // If OpenAI call fails, generate instant overlay as backup
       handleGenerateInstant();
     } finally {
       setIsGeneratingAi(false);
     }
-  }, [form, answers, fields, showToast]);
+  }, [form, answers, fields, apiKeyInput, showToast]);
+
+  const handleSaveApiKey = async (newKey) => {
+    const trimmed = (newKey !== undefined ? newKey : apiKeyInput || '').trim();
+    if (!trimmed) {
+      showToast('Please enter an OpenAI API key (starts with sk-)', 'error');
+      return;
+    }
+    localStorage.setItem('vfa_openai_key', trimmed);
+    setApiKeyInput(trimmed);
+    setShowKeyModal(false);
+    showToast('OpenAI API Key saved!', 'success');
+    try {
+      await apiSaveConfig({ openAiApiKey: trimmed });
+      setHasServerKey(true);
+    } catch {}
+    handleGenerateWithOpenAI(trimmed);
+  };
 
   // Generate Instant Client-side Overlay as fast fallback
   const handleGenerateInstant = useCallback(async () => {
@@ -224,8 +304,8 @@ export default function ReviewView() {
             </p>
           </div>
 
-          {/* Mode Switcher Tabs */}
-          <div className="form-preview-tabs" style={{ display: 'flex', gap: '8px' }}>
+          {/* Mode Switcher Tabs & API Key Button */}
+          <div className="form-preview-tabs" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button
               type="button"
               className={`view-fullscreen-btn ${activeMode === 'openai' ? 'active-tab-glow' : ''}`}
@@ -259,8 +339,80 @@ export default function ReviewView() {
               <Zap size={14} />
               <span>Instant View</span>
             </button>
+
+            <button
+              type="button"
+              className="view-fullscreen-btn"
+              onClick={() => setShowKeyModal(true)}
+              style={{
+                borderColor: (apiKeyInput || hasServerKey) ? 'rgba(0, 212, 170, 0.4)' : 'rgba(239, 68, 68, 0.4)',
+                background: (apiKeyInput || hasServerKey) ? 'rgba(0, 212, 170, 0.08)' : 'rgba(239, 68, 68, 0.08)',
+                color: (apiKeyInput || hasServerKey) ? 'var(--accent)' : '#ef4444',
+              }}
+              title="Configure OpenAI API Key"
+            >
+              <Key size={14} />
+              <span>{(apiKeyInput || hasServerKey) ? 'API Key ✓' : 'Add API Key'}</span>
+            </button>
           </div>
         </div>
+
+        {/* OpenAI Error Notification with Direct Key Input */}
+        {openAiError && (
+          <div
+            style={{
+              margin: '16px 20px',
+              padding: '16px 20px',
+              borderRadius: '12px',
+              background: 'rgba(239, 68, 68, 0.12)',
+              border: '1px solid rgba(239, 68, 68, 0.35)',
+              color: '#f87171',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
+              <AlertCircle size={18} />
+              <span>OpenAI API Note: {openAiError}</span>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.86rem', color: 'var(--text-secondary)' }}>
+              If your key was added to Vercel, please trigger a redeploy so Vercel loads the environment variable, or paste your OpenAI API key below to use it directly:
+            </p>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+              <input
+                type="password"
+                placeholder="sk-proj-..."
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                style={{
+                  flex: 1,
+                  minWidth: '220px',
+                  background: 'rgba(0,0,0,0.4)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  color: '#fff',
+                  fontSize: '0.9rem',
+                }}
+              />
+              <button
+                type="button"
+                className="view-fullscreen-btn"
+                onClick={() => handleSaveApiKey(apiKeyInput)}
+                style={{
+                  background: 'var(--accent)',
+                  color: '#000',
+                  fontWeight: 600,
+                  border: 'none',
+                  padding: '0 16px',
+                }}
+              >
+                Save &amp; Generate
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Loading State */}
         {(isGeneratingAi || isGeneratingInstant) && (
@@ -475,6 +627,81 @@ export default function ReviewView() {
                 alt="Filled Form High Resolution"
                 className="lightbox-full-img"
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* OpenAI API Key Settings Modal */}
+      {showKeyModal && (
+        <div className="image-lightbox-modal" onClick={() => setShowKeyModal(false)}>
+          <div
+            className="lightbox-content-box"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '480px', padding: '24px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Key className="text-teal" size={20} />
+                <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#fff' }}>OpenAI API Key</h3>
+              </div>
+              <button
+                type="button"
+                className="lightbox-close-btn"
+                onClick={() => setShowKeyModal(false)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: '1.5' }}>
+              Your OpenAI API key is used to generate the high-resolution original filled form document with your entered answers.
+              {hasServerKey && (
+                <span style={{ display: 'block', color: 'var(--accent)', marginTop: '6px', fontWeight: 500 }}>
+                  ✓ A valid OpenAI key is already detected on the server/Vercel.
+                </span>
+              )}
+            </p>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                OpenAI API Key (sk-...)
+              </label>
+              <input
+                type="password"
+                placeholder="sk-proj-..."
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                style={{
+                  width: '100%',
+                  background: 'rgba(0,0,0,0.4)',
+                  border: '1px solid var(--border-light)',
+                  borderRadius: '8px',
+                  padding: '10px 14px',
+                  color: '#fff',
+                  fontSize: '0.92rem',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setShowKeyModal(false)}
+                style={{ padding: '8px 16px' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => handleSaveApiKey(apiKeyInput)}
+                style={{ padding: '8px 16px' }}
+              >
+                Save &amp; Generate Form
+              </button>
             </div>
           </div>
         </div>

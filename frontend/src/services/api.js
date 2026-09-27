@@ -105,19 +105,34 @@ export async function apiGetFormTemplates() {
 
 // ── Generate form image using OpenAI ──────────────────────────────
 export async function apiGenerateFormImage({ template = 'bank_kyc', prompt = '', customKey = '' }) {
+  const activeKey = (customKey || (typeof window !== 'undefined' ? localStorage.getItem('vfa_openai_key') : '') || '').trim();
   return await safeJsonFetch(`${API_BASE}/api/forms/generate-image`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ template, prompt, customKey }),
+    body: JSON.stringify({ template, prompt, customKey: activeKey }),
   });
 }
 
 // ── Generate filled form image using OpenAI with user-entered data ─
-export async function apiGenerateFilledForm({ formTitle = '', answers = {}, fields = [], imageUrl = '', imageBase64 = '', formId = '' }) {
+export async function apiGenerateFilledForm({ formTitle = '', answers = {}, fields = [], imageUrl = '', imageBase64 = '', formId = '', customKey = '' }) {
+  const activeKey = (customKey || (typeof window !== 'undefined' ? localStorage.getItem('vfa_openai_key') : '') || '').trim();
   return await safeJsonFetch(`${API_BASE}/api/forms/generate-filled-form`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ formTitle, answers, fields, imageUrl, imageBase64, formId }),
+    body: JSON.stringify({ formTitle, answers, fields, imageUrl, imageBase64, formId, customKey: activeKey }),
+  });
+}
+
+// ── Config Status & Save ───────────────────────────────────────────
+export async function apiGetConfig() {
+  return await safeJsonFetch(`${API_BASE}/api/forms/config/status`);
+}
+
+export async function apiSaveConfig(payload) {
+  return await safeJsonFetch(`${API_BASE}/api/forms/config/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
   });
 }
 

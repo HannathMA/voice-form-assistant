@@ -138,27 +138,48 @@ const getConfig = (req, res) => {
  */
 const saveConfig = (req, res) => {
   try {
-    const { geminiApiKey } = req.body;
+    const { geminiApiKey, openAiApiKey } = req.body || {};
     if (geminiApiKey && typeof geminiApiKey === 'string') {
       const trimmed = geminiApiKey.trim();
       process.env.GEMINI_API_KEY = trimmed;
+    }
 
-      // Update .env file
+    if (openAiApiKey && typeof openAiApiKey === 'string') {
+      const trimmed = openAiApiKey.trim();
+      process.env.OPENAI_API_KEY = trimmed;
+    }
+
+    // Attempt to persist to .env file if filesystem is writable
+    try {
       const envPath = path.join(__dirname, '../.env');
       if (fs.existsSync(envPath)) {
         let content = fs.readFileSync(envPath, 'utf8');
-        if (/^GEMINI_API_KEY=.*$/m.test(content)) {
-          content = content.replace(/^GEMINI_API_KEY=.*$/m, `GEMINI_API_KEY=${trimmed}`);
-        } else {
-          content += `\nGEMINI_API_KEY=${trimmed}`;
+        if (geminiApiKey && typeof geminiApiKey === 'string') {
+          const trimmed = geminiApiKey.trim();
+          if (/^GEMINI_API_KEY=.*$/m.test(content)) {
+            content = content.replace(/^GEMINI_API_KEY=.*$/m, `GEMINI_API_KEY=${trimmed}`);
+          } else {
+            content += `\nGEMINI_API_KEY=${trimmed}`;
+          }
+        }
+        if (openAiApiKey && typeof openAiApiKey === 'string') {
+          const trimmed = openAiApiKey.trim();
+          if (/^OPENAI_API_KEY=.*$/m.test(content)) {
+            content = content.replace(/^OPENAI_API_KEY=.*$/m, `OPENAI_API_KEY=${trimmed}`);
+          } else {
+            content += `\nOPENAI_API_KEY=${trimmed}`;
+          }
         }
         fs.writeFileSync(envPath, content, 'utf8');
       }
+    } catch (fsErr) {
+      console.warn('Config local file write skipped (serverless environment):', fsErr.message);
     }
 
     res.json({
       success: true,
       hasGeminiKey: isGeminiKeyValid(process.env.GEMINI_API_KEY),
+      hasOpenAiKey: isOpenAiKeyValid(process.env.OPENAI_API_KEY),
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
