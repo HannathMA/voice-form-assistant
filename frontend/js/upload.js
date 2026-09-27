@@ -35,7 +35,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const config = await apiGetConfigStatus();
     hasActiveApiKey = Boolean(config.hasGeminiKey || (localKey && localKey.length > 15));
 
-    if (apiKeyBadge) {
+    const keyCard = document.getElementById('api-key-card');
+    if (config.hasGeminiKey && keyCard) {
+      // When GEMINI_API_KEY is configured in Vercel/server environment, hide the key input card completely!
+      keyCard.style.display = 'none';
+    } else if (apiKeyBadge) {
       if (hasActiveApiKey) {
         apiKeyBadge.textContent = '🟢 AI Vision Active';
         apiKeyBadge.style.background = 'rgba(0, 212, 170, 0.2)';
