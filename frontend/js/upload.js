@@ -20,54 +20,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const removeBtn   = document.getElementById('remove-img-btn');
   const detectBtn   = document.getElementById('detect-btn');
 
-  // ── Gemini API Key Configuration ───────────────────────────────
-  const apiKeyBadge = document.getElementById('api-key-badge');
-  const keyInput    = document.getElementById('gemini-key-input');
-  const saveKeyBtn  = document.getElementById('save-key-btn');
-  let hasActiveApiKey = false;
-
-  async function refreshApiKeyStatus() {
-    const localKey = localStorage.getItem('vfa_gemini_key') || '';
-    if (localKey && keyInput && !keyInput.value) {
-      keyInput.value = localKey;
-    }
-
-    const config = await apiGetConfigStatus();
-    hasActiveApiKey = Boolean(config.hasGeminiKey || (localKey && localKey.length > 15));
-
-    const keyCard = document.getElementById('api-key-card');
-    if (config.hasGeminiKey && keyCard) {
-      // When GEMINI_API_KEY is configured in Vercel/server environment, hide the key input card completely!
-      keyCard.style.display = 'none';
-    } else if (apiKeyBadge) {
-      if (hasActiveApiKey) {
-        apiKeyBadge.textContent = '🟢 AI Vision Active';
-        apiKeyBadge.style.background = 'rgba(0, 212, 170, 0.2)';
-        apiKeyBadge.style.color = 'var(--accent)';
-      } else {
-        apiKeyBadge.textContent = '⚠️ Key Needed';
-        apiKeyBadge.style.background = 'rgba(255, 193, 7, 0.2)';
-        apiKeyBadge.style.color = '#ffc107';
-      }
-    }
-  }
-
-  refreshApiKeyStatus();
-
-  saveKeyBtn?.addEventListener('click', async () => {
-    const val = keyInput?.value?.trim();
-    if (!val || val.length < 15) {
-      showToast('Please enter a valid Gemini API key (from Google AI Studio)', 'warning');
-      return;
-    }
-    localStorage.setItem('vfa_gemini_key', val);
-    try {
-      await apiSaveGeminiKey(val);
-    } catch {}
-    await refreshApiKeyStatus();
-    showToast('Gemini API key saved! Live AI detection is active.', 'success');
-  });
-
   let selectedFile = null;
 
   // ── Drag and Drop ──────────────────────────────────────────────
@@ -138,14 +90,6 @@ document.addEventListener('DOMContentLoaded', () => {
   detectBtn?.addEventListener('click', async () => {
     if (!selectedFile) return;
 
-    const localKey = localStorage.getItem('vfa_gemini_key') || '';
-    if (!hasActiveApiKey && !localKey) {
-      showToast('Please enter your Google Gemini API key to detect form fields using AI.', 'warning');
-      keyInput?.focus();
-      document.getElementById('api-key-card')?.scrollIntoView({ behavior: 'smooth' });
-      return;
-    }
-
     showSpinner('Detecting form fields with Gemini Vision AI… This takes 5–15 seconds.');
     detectBtn.disabled = true;
 
@@ -154,9 +98,6 @@ document.addEventListener('DOMContentLoaded', () => {
       formData.append('formImage', selectedFile);
       formData.append('userId', getUserId());
       formData.append('language', getLang());
-      if (localKey) {
-        formData.append('geminiApiKey', localKey);
-      }
 
       const result = await apiUploadForm(formData);
 
