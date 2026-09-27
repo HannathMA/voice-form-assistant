@@ -36,9 +36,16 @@ app.use('/api/forms', formRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/voice', voiceRoutes);
 
-// ── Catch-all: serve index.html for non-API routes ────────────
-app.get('*', (req, res) => {
-  res.sendFile(path.join(staticDir, 'index.html'));
+// ── Catch-all for non-API routes ──────────────────────────────
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ success: false, message: `API route not found: ${req.method} ${req.originalUrl}` });
+  }
+  const indexPath = path.join(staticDir, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    return res.sendFile(indexPath);
+  }
+  res.status(404).send('Not Found');
 });
 
 // ── Global error handler ───────────────────────────────────────
@@ -50,9 +57,9 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ── Start server ───────────────────────────────────────────────
-const PORT = process.env.PORT || 5000;
-if (!process.env.VERCEL) {
+// ── Start server (only when run directly, not when required by serverless lambda) ──
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
   });

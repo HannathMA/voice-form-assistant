@@ -18,7 +18,7 @@ const detectFormFields = async (imageInput, language = 'en', customKey = null) =
 
   if (!isGeminiKeyValid(activeKey)) {
     throw new Error(
-      'Gemini API key is not configured in environment variables (GEMINI_API_KEY).'
+      'Gemini API key is not configured in Vercel Environment Variables. Please add GEMINI_API_KEY in Vercel Settings -> Environment Variables.'
     );
   }
 
