@@ -11,6 +11,7 @@ const fieldSchema = new mongoose.Schema(
     options: [String],        // for select fields
     required: { type: Boolean, default: false },
     placeholder: String,
+    box_2d: [Number],         // [ymin, xmin, ymax, xmax] normalized on 0-1000 scale
   },
   { _id: false }
 );

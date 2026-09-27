@@ -25,13 +25,13 @@ const textToSpeech = async (text, language = 'en') => {
     {
       inputs: [text],
       target_language_code: langCode,
-      speaker: 'meera',          // female voice; change to 'arjun' for male
+      speaker: 'kavya',          // verified valid voice for bulbul:v3 across all languages
       pitch: 0,
       pace: 1.0,
       loudness: 1.5,
       speech_sample_rate: 8000,
       enable_preprocessing: true,
-      model: 'bulbul:v1',
+      model: 'bulbul:v3',
     },
     {
       headers: {
@@ -50,23 +50,36 @@ const textToSpeech = async (text, language = 'en') => {
 
 /**
  * Convert speech audio to text using Sarvam AI.
- * @param {Buffer} audioBuffer  - Raw audio buffer (WAV/WebM)
- * @param {string} language     - Language code: en | ml | hi | ta | te
- * @returns {Promise<string>}   - Transcript
+ * @param {Buffer} audioBuffer    - Raw audio buffer (WAV/WebM/MP4)
+ * @param {string} language       - Language code: en | ml | hi | ta | te
+ * @param {string} [mimetype]     - Audio mimetype
+ * @param {string} [originalname] - Original file name
+ * @returns {Promise<string>}     - Transcript
  */
-const speechToText = async (audioBuffer, language = 'en') => {
+const speechToText = async (audioBuffer, language = 'en', mimetype = 'audio/wav', originalname = 'recording.wav') => {
   const langCode = LANGUAGE_MAP[language] || 'en-IN';
+
+  let ext = 'wav';
+  const type = (mimetype || '').toLowerCase();
+  if (type.includes('webm')) {
+    ext = 'webm';
+  } else if (type.includes('mp4') || type.includes('m4a')) {
+    ext = 'mp4';
+  } else if (type.includes('ogg')) {
+    ext = 'ogg';
+  }
+
+  const filename = originalname && originalname.includes('.') ? originalname : `recording.${ext}`;
 
   // Sarvam STT expects multipart/form-data with the audio file
   const FormData = require('form-data');
   const form = new FormData();
   form.append('file', audioBuffer, {
-    filename: 'recording.wav',
-    contentType: 'audio/wav',
+    filename,
+    contentType: mimetype || 'audio/wav',
   });
   form.append('language_code', langCode);
-  form.append('model', 'saarika:v2');
-  form.append('with_timestamps', 'false');
+  form.append('model', 'saaras:v3');
 
   const response = await axios.post(`${SARVAM_BASE}/speech-to-text`, form, {
     headers: {

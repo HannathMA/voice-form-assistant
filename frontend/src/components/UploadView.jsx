@@ -1,6 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { apiUploadForm, apiCreateSession } from '../services/api';
+import {
+  apiUploadForm,
+  apiCreateSession,
+} from '../services/api';
 import {
   UploadCloud,
   FileImage,
@@ -10,6 +13,8 @@ import {
   Lightbulb,
   ArrowLeft,
   ChevronRight,
+  ShieldCheck,
+  Languages,
 } from 'lucide-react';
 
 export default function UploadView() {
@@ -49,6 +54,16 @@ export default function UploadView() {
     setSelectedFile(file);
     const objectUrl = URL.createObjectURL(file);
     setPreviewUrl(objectUrl);
+
+    // Read base64 data so it can be sent to OpenAI API on Vercel
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        localStorage.setItem('vfa_form_base64', reader.result);
+      } catch {}
+    };
+    reader.readAsDataURL(file);
+
     showToast(t('imgSelected'), 'success');
   };
 
@@ -80,7 +95,7 @@ export default function UploadView() {
   const handleDetectFields = async () => {
     if (!selectedFile) return;
 
-    showLoading('Gemini Vision AI is analyzing your form… Detecting fields and questions…');
+    showLoading('AI is analyzing your uploaded form… Detecting fields and labels…');
     try {
       const formData = new FormData();
       formData.append('formImage', selectedFile);
@@ -94,12 +109,29 @@ export default function UploadView() {
         formTitle: result.formTitle,
         fields: result.fields,
         imageUrl: result.imageUrl,
+        imageDataUrl: localStorage.getItem('vfa_form_base64') || '',
       });
       setFormId(result.formId);
       localStorage.setItem('vfa_form_id', result.formId);
+      if (result.imageUrl) {
+        localStorage.setItem('vfa_form_img', result.imageUrl);
+      }
 
-      // Create new session in MongoDB
-      const newSession = await apiCreateSession(result.formId, userId);
+      // Create new session (with local fallback if backend offline)
+      let newSession;
+      try {
+        newSession = await apiCreateSession(result.formId, userId);
+      } catch (sessErr) {
+        console.warn('Backend session creation fallback to local session:', sessErr.message);
+        newSession = {
+          _id: 'local_sess_' + Date.now(),
+          userId,
+          formId: result.formId,
+          answers: {},
+          currentField: 0,
+          status: 'in_progress',
+        };
+      }
       setSession(newSession);
       setSessionId(newSession._id);
       localStorage.setItem('vfa_session_id', newSession._id);
@@ -112,9 +144,9 @@ export default function UploadView() {
       // Move smoothly to Step 3 Wizard
       setTimeout(() => {
         setActiveStep(3);
-      }, 500);
+      }, 400);
     } catch (err) {
-      showToast(err.message || 'AI detection failed. Please check your network and Gemini API key.', 'error');
+      showToast(err.message || 'AI detection failed. Please check your image or network.', 'error');
     } finally {
       hideLoading();
     }
@@ -134,7 +166,7 @@ export default function UploadView() {
       <div className="upload-layout-grid">
         {/* Left Column: Dropzone & Actions */}
         <div className="upload-main-col">
-          {/* Dropzone */}
+          {/* Dropzone / Preview */}
           <div
             className={`dropzone-card ${isDragging ? 'dragging' : ''} ${selectedFile ? 'has-file' : ''}`}
             onDragOver={handleDragOver}
@@ -153,7 +185,7 @@ export default function UploadView() {
             {!selectedFile ? (
               <div className="dropzone-empty-state">
                 <div className="dropzone-icon-glow">
-                  <UploadCloud size={40} className="text-teal" />
+                  <UploadCloud size={44} className="text-teal" />
                 </div>
                 <h2 className="dropzone-title">{t('uploadTitle')}</h2>
                 <p className="dropzone-sub">{t('uploadSub')}</p>
@@ -179,7 +211,7 @@ export default function UploadView() {
                   <img src={previewUrl} alt="Form preview" className="preview-img-element" />
                   <div className="preview-badge">
                     <CheckCircle2 size={16} className="text-teal" />
-                    <span>Ready</span>
+                    <span>Ready to Process</span>
                   </div>
                 </div>
 
@@ -241,6 +273,26 @@ export default function UploadView() {
                   {t('currentLangNote')} {currentLangObj.name}
                 </span>
               </div>
+            </div>
+          </div>
+
+          {/* Secure & Privacy Badge Card */}
+          <div className="side-card" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px' }}>
+            <div style={{
+              width: '38px',
+              height: '38px',
+              borderRadius: '10px',
+              background: 'rgba(0, 212, 170, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#00d4aa'
+            }}>
+              <ShieldCheck size={22} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#f1f5f9' }}>Voice & Data Private</div>
+              <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Processed in your selected language ({currentLangObj.name})</div>
             </div>
           </div>
 

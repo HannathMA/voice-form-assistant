@@ -9,12 +9,13 @@ export const getApiBase = () => {
     if (saved && saved.trim()) return saved.trim().replace(/\/$/, '');
   }
 
-  // 2. If running on Vercel deployment or behind Vite proxy (port 5173), use relative /api
+  // 2. If running locally (localhost, 127.0.0.1) or on Vercel deployment, use relative ''
   if (typeof window !== 'undefined') {
     const loc = window.location;
     if (
+      loc.hostname === 'localhost' ||
+      loc.hostname === '127.0.0.1' ||
       loc.hostname.endsWith('.vercel.app') ||
-      loc.port === '5173' ||
       !loc.port
     ) {
       return '';
@@ -26,7 +27,7 @@ export const getApiBase = () => {
     return import.meta.env.VITE_API_URL.replace(/\/$/, '');
   }
 
-  return 'https://voice-form-assistant.vercel.app';
+  return '';
 };
 
 export const API_BASE = getApiBase();
@@ -86,11 +87,47 @@ export async function apiSaveGeminiKey(key) {
   });
 }
 
+// ── Form templates ─────────────────────────────────────────────────
+export async function apiGetFormTemplates() {
+  try {
+    const data = await safeJsonFetch(`${API_BASE}/api/forms/templates`);
+    return data.templates || [];
+  } catch {
+    return [
+      { id: 'bank_kyc', name: 'State Bank KYC Form', description: 'Personal details, PAN, Aadhaar, address & photo box' },
+      { id: 'bank_account', name: 'Bank Account Opening Form', description: 'Account type, personal info, nominee & branch details' },
+      { id: 'college_admission', name: 'College Admission Form', description: 'Student name, course, qualifications & contact' },
+      { id: 'loan_application', name: 'Loan Application Form', description: 'Applicant details, income, loan amount & declaration' },
+      { id: 'job_application', name: 'Employment Application Form', description: 'Candidate info, position applied for & qualifications' },
+    ];
+  }
+}
+
+// ── Generate form image using OpenAI ──────────────────────────────
+export async function apiGenerateFormImage({ template = 'bank_kyc', prompt = '', customKey = '' }) {
+  return await safeJsonFetch(`${API_BASE}/api/forms/generate-image`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ template, prompt, customKey }),
+  });
+}
+
+// ── Generate filled form image using OpenAI with user-entered data ─
+export async function apiGenerateFilledForm({ formTitle = '', answers = {}, fields = [], imageUrl = '', imageBase64 = '', formId = '' }) {
+  return await safeJsonFetch(`${API_BASE}/api/forms/generate-filled-form`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ formTitle, answers, fields, imageUrl, imageBase64, formId }),
+  });
+}
+
+
 // ── Get form by ID ─────────────────────────────────────────────────
 export async function apiGetForm(formId) {
   const data = await safeJsonFetch(`${API_BASE}/api/forms/${formId}`);
   return data.form;
 }
+
 
 // ── Create new session ─────────────────────────────────────────────
 export async function apiCreateSession(formId, userId) {
@@ -141,7 +178,14 @@ export async function apiTextToSpeech(text, language) {
 // ── Speech-to-Text (Sarvam AI API) ─────────────────────────────────
 export async function apiSpeechToText(audioBlob, language) {
   const fd = new FormData();
-  fd.append('audio', audioBlob, 'recording.wav');
+  let ext = 'webm';
+  if (audioBlob.type) {
+    if (audioBlob.type.includes('wav')) ext = 'wav';
+    else if (audioBlob.type.includes('mp4')) ext = 'mp4';
+    else if (audioBlob.type.includes('ogg')) ext = 'ogg';
+    else if (audioBlob.type.includes('webm')) ext = 'webm';
+  }
+  fd.append('audio', audioBlob, `recording.${ext}`);
   fd.append('language', language);
   const data = await safeJsonFetch(`${API_BASE}/api/voice/speech-to-text`, {
     method: 'POST',

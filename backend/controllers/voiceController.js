@@ -64,7 +64,12 @@ const handleSpeechToText = async (req, res) => {
       });
     }
 
-    const transcript = await speechToText(req.file.buffer, language);
+    const transcript = await speechToText(
+      req.file.buffer,
+      language,
+      req.file.mimetype,
+      req.file.originalname
+    );
     res.json({ success: true, transcript });
   } catch (err) {
     console.warn('STT error (falling back to browser recognition):', err.message);

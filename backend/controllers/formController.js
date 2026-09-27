@@ -4,6 +4,12 @@ const Form = require('../models/Form');
 const User = require('../models/User');
 const { detectFormFields, isGeminiKeyValid } = require('../services/geminiService');
 const { isDbConnected, memoryStore } = require('../config/store');
+const {
+  FORM_TEMPLATES,
+  isOpenAiKeyValid,
+  generateFormImage,
+  generateFilledFormImage,
+} = require('../services/imageGenService');
 
 /**
  * POST /api/forms/upload
@@ -68,10 +74,13 @@ const uploadAndDetect = async (req, res) => {
       });
     }
 
+    const imgUrl = '/' + (savedForm.imagePath || relativePath).replace(/^\/+/, '');
+
     res.status(201).json({
       success: true,
       formId: savedForm._id,
       formTitle: savedForm.formTitle,
+      imageUrl: imgUrl,
       fields: savedForm.fields,
     });
   } catch (err) {
@@ -120,6 +129,7 @@ const getConfig = (req, res) => {
     success: true,
     hasGeminiKey: isGeminiKeyValid(process.env.GEMINI_API_KEY),
     hasSarvamKey: isGeminiKeyValid(process.env.SARVAM_API_KEY),
+    hasOpenAiKey: isOpenAiKeyValid(process.env.OPENAI_API_KEY),
   });
 };
 
@@ -155,4 +165,83 @@ const saveConfig = (req, res) => {
   }
 };
 
-module.exports = { uploadAndDetect, getFormById, getConfig, saveConfig };
+/**
+ * POST /api/forms/generate-image
+ * Body: { template?: string, prompt?: string, customKey?: string }
+ */
+const generateFormImageHandler = async (req, res) => {
+  try {
+    const { template, prompt, customKey } = req.body || {};
+    const result = await generateFormImage({ template, prompt, customKey });
+    res.status(201).json(result);
+  } catch (err) {
+    console.error('Image generation error:', err.message);
+    res.status(500).json({
+      success: false,
+      message: err.message || 'Failed to generate form image with OpenAI',
+    });
+  }
+};
+
+/**
+ * GET /api/forms/templates
+ */
+const getFormTemplatesHandler = (req, res) => {
+  res.json({
+    success: true,
+    templates: Object.values(FORM_TEMPLATES),
+  });
+};
+
+/**
+ * POST /api/forms/generate-filled-form
+ */
+const generateFilledFormImageHandler = async (req, res) => {
+  try {
+    const { formTitle, answers, fields, customKey, imageUrl, imageBase64, formId } = req.body || {};
+    let targetImagePath = null;
+
+    if (imageUrl) {
+      const cleanRel = imageUrl.replace(/^\/+/, '');
+      const candidate = path.join(__dirname, '../', cleanRel);
+      if (fs.existsSync(candidate)) {
+        targetImagePath = candidate;
+      }
+    } else if (formId) {
+      const formDoc = isDbConnected() ? await Form.findById(formId) : memoryStore.getForm(formId);
+      if (formDoc && formDoc.imagePath) {
+        const candidate = path.join(__dirname, '../', formDoc.imagePath.replace(/^\/+/, ''));
+        if (fs.existsSync(candidate)) {
+          targetImagePath = candidate;
+        }
+      }
+    }
+
+    const result = await generateFilledFormImage({
+      formTitle,
+      answers,
+      fields,
+      imagePath: targetImagePath,
+      imageBase64,
+      customKey,
+    });
+    res.status(201).json(result);
+  } catch (err) {
+    console.error('Filled form generation error:', err.message);
+    res.status(500).json({
+      success: false,
+      message: err.message || 'Failed to generate filled form image with OpenAI',
+    });
+  }
+};
+
+module.exports = {
+  uploadAndDetect,
+  getFormById,
+  getConfig,
+  saveConfig,
+  generateFormImageHandler,
+  getFormTemplatesHandler,
+  generateFilledFormImageHandler,
+};
+

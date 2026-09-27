@@ -87,14 +87,26 @@ export function AppProvider({ children }) {
   const updateAnswer = useCallback((fieldLabel, val) => {
     setAnswers(prev => {
       const next = { ...prev, [fieldLabel]: val };
+      try {
+        localStorage.setItem('vfa_answers', JSON.stringify(next));
+      } catch {}
       return next;
     });
   }, []);
 
   const saveSessionProgress = useCallback(async (newIndex, nextAnswers = null, status = 'in_progress') => {
     if (!sessionId) return;
+    const payloadAnswers = nextAnswers !== null ? nextAnswers : answers;
     try {
-      const payloadAnswers = nextAnswers !== null ? nextAnswers : answers;
+      localStorage.setItem('vfa_answers', JSON.stringify(payloadAnswers));
+      localStorage.setItem('vfa_current_field', String(newIndex));
+    } catch {}
+
+    if (sessionId.startsWith('local_sess_')) {
+      return;
+    }
+
+    try {
       await apiUpdateSession(sessionId, {
         answers: payloadAnswers,
         currentField: newIndex,
@@ -115,6 +127,8 @@ export function AppProvider({ children }) {
   const resetForm = useCallback(() => {
     localStorage.removeItem('vfa_form_id');
     localStorage.removeItem('vfa_session_id');
+    localStorage.removeItem('vfa_answers');
+    localStorage.removeItem('vfa_current_field');
     setForm(null);
     setFormId('');
     setSession(null);
@@ -135,6 +149,28 @@ export function AppProvider({ children }) {
       const targetSessionId = urlSessionId || sessionId;
 
       if (targetSessionId) {
+        if (targetSessionId.startsWith('local_sess_')) {
+          setSessionId(targetSessionId);
+          try {
+            const savedAnswers = JSON.parse(localStorage.getItem('vfa_answers') || '{}');
+            const savedIndex = parseInt(localStorage.getItem('vfa_current_field') || '0', 10);
+            setAnswers(savedAnswers);
+            setCurrentFieldIndex(savedIndex);
+          } catch {}
+
+          if (targetFormId) {
+            try {
+              const f = await apiGetForm(targetFormId);
+              setForm(f);
+              setFormId(f._id);
+            } catch (e) {
+              console.warn('Could not restore form for local session:', e.message);
+            }
+          }
+          setActiveStep(3);
+          return;
+        }
+
         try {
           const sess = await apiGetSession(targetSessionId);
           setSession(sess);
@@ -159,6 +195,7 @@ export function AppProvider({ children }) {
           }
         } catch (e) {
           console.warn('Could not restore session:', e.message);
+          localStorage.removeItem('vfa_session_id');
         }
       } else if (targetFormId) {
         try {
@@ -169,6 +206,7 @@ export function AppProvider({ children }) {
           setActiveStep(3);
         } catch (e) {
           console.warn('Could not restore form:', e.message);
+          localStorage.removeItem('vfa_form_id');
         }
       }
     };

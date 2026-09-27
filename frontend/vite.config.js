@@ -4,7 +4,7 @@ import { defineConfig, loadEnv } from 'vite'
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const apiTarget = env.VITE_API_URL || 'https://voice-form-assistant.vercel.app'
+  const apiTarget = env.VITE_BACKEND_URL || (env.VITE_API_URL && !env.VITE_API_URL.includes('vercel.app') ? env.VITE_API_URL : 'http://localhost:5000')
 
   return {
     plugins: [react()],

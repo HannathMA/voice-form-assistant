@@ -141,10 +141,22 @@ export async function startRecording(onStatusChange) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunks = [];
-      mediaRecorder = new MediaRecorder(stream);
+
+      let mimeType = '';
+      if (typeof MediaRecorder !== 'undefined') {
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          mimeType = 'audio/webm;codecs=opus';
+        } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+          mimeType = 'audio/webm';
+        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+          mimeType = 'audio/mp4';
+        }
+      }
+
+      mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
 
       mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunks.push(e.data);
+        if (e.data && e.data.size > 0) audioChunks.push(e.data);
       };
 
       mediaRecorder.start(250);
@@ -180,7 +192,8 @@ export async function stopRecording(language, onStatusChange) {
           mediaRecorder.stream?.getTracks().forEach(t => t.stop());
         } catch {}
 
-        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+        const mime = mediaRecorder.mimeType || 'audio/webm';
+        const audioBlob = new Blob(audioChunks, { type: mime });
         audioChunks = [];
 
         if (onStatusChange) onStatusChange('processing');
@@ -192,13 +205,12 @@ export async function stopRecording(language, onStatusChange) {
             resolve(transcript);
             return;
           }
-        } catch {
-          // Fall through to browser speech recognition fallback
+        } catch (err) {
+          console.warn('Sarvam STT failed:', err.message);
         }
 
-        const fallback = await browserSTTFallback(language);
         if (onStatusChange) onStatusChange('done');
-        resolve(fallback);
+        resolve('');
       };
 
       try {

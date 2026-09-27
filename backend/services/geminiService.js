@@ -1,4 +1,9 @@
-require('dotenv').config();
+const path = require('path');
+const dotenv = require('dotenv');
+dotenv.config({ path: path.join(__dirname, '../.env') });
+dotenv.config({ path: path.join(__dirname, '../../.env') });
+dotenv.config();
+
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const fs = require('fs');
 
@@ -44,7 +49,7 @@ const detectFormFields = async (imageInput, language = 'en', customKey = null) =
   }
 
   const prompt = `You are an expert AI form digitizer and OCR assistant.
-Carefully examine the attached form image. Extract all detectable fields and return ONLY a valid JSON object (no markdown formatting, no code fences, no explanations).
+Carefully examine the attached form image. Extract all detectable fields and their exact input box locations. Return ONLY a valid JSON object (no markdown formatting, no code fences, no explanations).
 
 Preferred language: "${language}".
 If the form has text or labels in Malayalam, Hindi, Tamil, Telugu, or English, extract the exact labels as printed.
@@ -56,11 +61,17 @@ Format:
     {
       "label": "Exact label or question as printed on the form",
       "type": "text | number | date | select | checkbox | textarea",
+      "box_2d": [ymin, xmin, ymax, xmax],
       "options": ["option 1", "option 2"],
       "required": false
     }
   ]
 }
+
+Rules for box_2d:
+- "box_2d" MUST be an array of 4 integers [ymin, xmin, ymax, xmax] on a 0 to 1000 normalized scale.
+- It specifies the EXACT designated blank input box, rectangle, line, or square grid on the image where the user's answer should be written.
+- ymin is the top edge (0-1000), xmin is left edge (0-1000), ymax is bottom edge (0-1000), xmax is right edge (0-1000).
 
 Field type rules:
 - "type" MUST be one of: "text", "number", "date", "select", "checkbox", "textarea".
@@ -72,13 +83,11 @@ Field type rules:
 - Extract all fields visible on the form in sequential top-to-bottom order.`;
 
   const modelsToTry = [
+    'gemini-3-flash-preview',
     'gemini-3.8-flash',
-    'gemini-3.7-flash',
-    'gemini-3.6-flash',
-    'gemini-3.5-flash',
-    'gemini-flash-latest',
     'gemini-3.5-flash-lite',
-    'gemini-flash-lite-latest',
+    'gemini-3.1-pro-preview',
+    'gemini-flash-latest',
     'gemini-pro-latest',
   ];
   let lastError = null;
@@ -116,7 +125,51 @@ Field type rules:
     }
   }
 
-  throw new Error(`Gemini Vision API error: ${lastError ? lastError.message : 'No fields could be detected'}`);
+  // Fallback to OpenAI Vision (gpt-4o-mini) if Gemini models are quota-limited or fail
+  const openAiKey = (process.env.OPENAI_API_KEY || '').trim();
+  if (openAiKey && openAiKey.length > 20) {
+    try {
+      console.log('🔄 Attempting fallback OCR detection with OpenAI Vision (gpt-4o-mini)...');
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${openAiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: prompt },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: `data:${mimeType};base64,${base64Image}`,
+                  },
+                },
+              ],
+            },
+          ],
+          response_format: { type: 'json_object' },
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok && data.choices?.[0]?.message?.content) {
+        const parsed = JSON.parse(data.choices[0].message.content);
+        if (Array.isArray(parsed.fields) && parsed.fields.length > 0) {
+          console.log(`✅ OpenAI Vision successfully detected ${parsed.fields.length} fields!`);
+          return parsed;
+        }
+      }
+    } catch (openAiErr) {
+      console.warn('⚠️ OpenAI Vision fallback error:', openAiErr.message);
+    }
+  }
+
+  throw new Error(`Vision AI error: ${lastError ? lastError.message : 'No fields could be detected from the form'}`);
 };
 
 module.exports = { detectFormFields, isGeminiKeyValid };

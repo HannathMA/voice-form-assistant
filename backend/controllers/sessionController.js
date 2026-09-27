@@ -7,9 +7,13 @@ const { isDbConnected, memoryStore } = require('../config/store');
  */
 const createSession = async (req, res) => {
   try {
-    const { userId, formId } = req.body;
+    let { userId, formId } = req.body;
     if (!userId || !formId) {
       return res.status(400).json({ success: false, message: 'userId and formId are required.' });
+    }
+
+    if (typeof formId === 'object' && formId !== null) {
+      formId = formId._id || formId.id || String(formId);
     }
 
     if (isDbConnected()) {

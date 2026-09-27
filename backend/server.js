@@ -1,7 +1,13 @@
-require('dotenv').config();
+const path = require('path');
+const dotenv = require('dotenv');
+
+// Ensure environment variables are loaded from backend/.env or root .env
+dotenv.config({ path: path.join(__dirname, '.env') });
+dotenv.config({ path: path.join(__dirname, '../.env') });
+dotenv.config();
+
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 const fs = require('fs');
 const connectDB = require('./config/db');
 
