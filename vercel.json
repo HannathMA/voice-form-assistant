@@ -1,11 +1,6 @@
 {
   "version": 2,
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index.js" },
-    { "source": "/uploads/(.*)", "destination": "/api/index.js" },
-    { "source": "/css/(.*)", "destination": "/frontend/css/$1" },
-    { "source": "/js/(.*)", "destination": "/frontend/js/$1" },
-    { "source": "/(.*\\.(html|ico|png|jpg|jpeg|webp|svg|json))", "destination": "/frontend/$1" },
-    { "source": "/(.*)", "destination": "/frontend/index.html" }
+    { "source": "/api/(.*)", "destination": "/api/index.js" }
   ]
 }

@@ -26,7 +26,10 @@ app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ── Serve frontend statically ──────────────────────────────────
-app.use(express.static(path.join(__dirname, '../frontend')));
+const staticDir = fs.existsSync(path.join(__dirname, '../public'))
+  ? path.join(__dirname, '../public')
+  : path.join(__dirname, '../frontend');
+app.use(express.static(staticDir));
 
 // ── API Routes ─────────────────────────────────────────────────
 app.use('/api/forms', formRoutes);
@@ -35,7 +38,7 @@ app.use('/api/voice', voiceRoutes);
 
 // ── Catch-all: serve index.html for non-API routes ────────────
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../frontend/index.html'));
+  res.sendFile(path.join(staticDir, 'index.html'));
 });
 
 // ── Global error handler ───────────────────────────────────────

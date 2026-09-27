@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Upload Your Form — Voice Form Assistant</title>
+  <meta name="description" content="Upload a photo of your paper form. Our AI will detect all fields automatically." />
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .page-wrapper {
+      min-height: calc(100vh - 70px);
+      padding: 60px 0 80px;
+      position: relative;
+      z-index: 1;
+    }
+    .page-header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    /* ── Upload zone ────────────────────────────────────── */
+    .upload-zone {
+      border: 2.5px dashed rgba(0,212,170,0.4);
+      border-radius: var(--radius-lg);
+      padding: 60px 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: var(--transition);
+      background: var(--bg-glass);
+      backdrop-filter: blur(10px);
+      position: relative;
+      overflow: hidden;
+    }
+    .upload-zone::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at center, var(--accent-light) 0%, transparent 70%);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .upload-zone:hover::before,
+    .upload-zone.drag-over::before { opacity: 1; }
+    .upload-zone:hover,
+    .upload-zone.drag-over {
+      border-color: var(--accent);
+      box-shadow: var(--shadow-accent);
+    }
+    .upload-zone.drag-over { border-style: solid; }
+    .upload-icon {
+      font-size: 4rem;
+      margin-bottom: 16px;
+      display: block;
+      position: relative;
+    }
+    .upload-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      position: relative;
+    }
+    .upload-sub {
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+      position: relative;
+    }
+    .upload-or {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 24px;
+      position: relative;
+    }
+    .upload-or::before, .upload-or::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(255,255,255,0.1);
+    }
+    #file-input { display: none; }
+    .browse-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 28px;
+      border-radius: var(--radius-xl);
+      background: var(--accent-light);
+      color: var(--accent);
+      border: 1.5px solid var(--accent);
+      font-family: 'Outfit', sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+      position: relative;
+    }
+    .browse-btn:hover {
+      background: var(--accent);
+      color: var(--bg-primary);
+    }
+    .upload-hint {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin-top: 16px;
+      position: relative;
+    }
+
+    /* ── Preview area ────────────────────────────────────── */
+    .preview-area {
+      display: none;
+      margin-top: 32px;
+    }
+    .preview-area.visible { display: block; }
+    .preview-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .preview-label { font-weight: 700; font-size: 1rem; }
+    .preview-img-wrapper {
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.1);
+      max-height: 400px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.3);
+    }
+    #preview-img {
+      max-width: 100%;
+      max-height: 400px;
+      object-fit: contain;
+      display: block;
+    }
+    .file-info {
+      display: flex;
+      gap: 16px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .file-info-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+    }
+
+    /* ── Detect button area ──────────────────────────────── */
+    .detect-area {
+      margin-top: 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    #detect-btn { min-width: 260px; }
+    #detect-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .detect-note {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      text-align: center;
+      max-width: 440px;
+    }
+
+    /* ── Tips column ─────────────────────────────────────── */
+    .tips-card { margin-top: 40px; }
+    .tips-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 16px;
+    }
+    .tip-item {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 14px;
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    .tip-emoji { font-size: 1.2rem; flex-shrink: 0; }
+
+    /* ── Layout ──────────────────────────────────────────── */
+    .upload-layout {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 32px;
+      align-items: start;
+    }
+    @media (max-width: 900px) { .upload-layout { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar" role="navigation" aria-label="Main navigation">
+    <div class="container">
+      <a href="index.html" class="navbar-brand">🎙️ VoiceForm</a>
+      <div class="navbar-lang">
+        <span id="nav-lang-label">Language:</span> <span id="nav-lang-display">English</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Spinner overlay -->
+  <div class="spinner-overlay" id="spinner" role="status" aria-label="Processing">
+    <div class="spinner"></div>
+    <span class="spinner-text" id="spinner-text">Analysing your form with AI…</span>
+  </div>
+
+  <div class="page-wrapper">
+    <div class="container">
+
+      <!-- Header -->
+      <header class="page-header">
+        <p class="section-label">Step 2</p>
+        <h1 class="section-title">Upload Your Form</h1>
+        <p class="section-sub" style="margin: 0 auto;">
+          Take a clear photo of any paper form and upload it.
+          Our AI will read and detect all the fields for you.
+        </p>
+      </header>
+
+      <div class="upload-layout">
+        <!-- Main upload column -->
+        <div>
+          <!-- Drop zone -->
+          <div class="upload-zone" id="upload-zone" role="button"
+            tabindex="0" aria-label="Drop your form image here or click to browse">
+            <span class="upload-icon">📄</span>
+            <h2 class="upload-title">Drop your form here</h2>
+            <p class="upload-sub">Drag and drop a photo of your form</p>
+            <div class="upload-or">or</div>
+            <label class="browse-btn" for="file-input" role="button" aria-label="Browse files">
+              📁 Browse Files
+            </label>
+            <input type="file" id="file-input" accept="image/*" aria-label="Select image file" />
+            <p class="upload-hint">Supports: JPG, PNG, WebP · Max 10 MB</p>
+          </div>
+
+          <!-- Preview -->
+          <div class="preview-area" id="preview-area">
+            <div class="preview-header">
+              <span class="preview-label">📷 Selected Image</span>
+              <button class="btn btn-ghost btn-sm" id="remove-img-btn" aria-label="Remove selected image">
+                ✕ Remove
+              </button>
+            </div>
+            <div class="preview-img-wrapper">
+              <img id="preview-img" src="" alt="Preview of uploaded form" />
+            </div>
+            <div class="file-info">
+              <span class="file-info-item" id="file-name-display">📄 filename.jpg</span>
+              <span class="file-info-item" id="file-size-display">📦 0 KB</span>
+            </div>
+          </div>
+
+          <!-- Detect button -->
+          <div class="detect-area">
+            <button class="btn btn-primary btn-lg" id="detect-btn" disabled
+              aria-label="Detect form fields using AI">
+              🤖 Detect Form Fields
+            </button>
+            <p class="detect-note">
+              The AI will identify every field in your form. This takes about 10–20 seconds.
+            </p>
+          </div>
+        </div>
+
+        <!-- Tips column -->
+        <aside>
+          <!-- Gemini API Key Setup Card -->
+          <div class="card api-key-card" id="api-key-card" style="margin-bottom: 24px; border: 1.5px solid rgba(0, 212, 170, 0.3);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+              <span style="font-weight: 700; font-size: 0.95rem; color: var(--accent);">🔑 Gemini AI Vision API</span>
+              <span id="api-key-badge" style="font-size: 0.78rem; padding: 3px 8px; border-radius: 12px; background: rgba(255, 193, 7, 0.2); color: #ffc107; font-weight: 600;">
+                Checking…
+              </span>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.4;">
+              Uses Google Gemini Vision API to detect and extract form fields directly from your uploaded image.
+            </p>
+            <div class="api-key-input-row" style="display: flex; gap: 8px;">
+              <input
+                type="password"
+                id="gemini-key-input"
+                class="form-input"
+                placeholder="Paste Gemini API Key..."
+                style="font-size: 0.85rem; padding: 8px 12px; flex: 1; border-radius: var(--radius-sm);"
+              />
+              <button class="btn btn-primary btn-sm" id="save-key-btn" style="padding: 8px 14px; font-size: 0.85rem; white-space: nowrap;">
+                Save
+              </button>
+            </div>
+            <p style="font-size: 0.8rem; margin-top: 8px; color: var(--text-muted);">
+              Get free key: <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: underline;">Google AI Studio ↗</a>
+            </p>
+          </div>
+
+          <div class="card tips-card">
+            <p class="tips-title">📸 Tips for best results</p>
+            <div class="tip-item">
+              <span class="tip-emoji">☀️</span>
+              <span>Take the photo in good lighting — avoid shadows.</span>
+            </div>
+            <div class="tip-item">
+              <span class="tip-emoji">📐</span>
+              <span>Hold the camera straight above the form, not at an angle.</span>
+            </div>
+            <div class="tip-item">
+              <span class="tip-emoji">🔍</span>
+              <span>Make sure all text on the form is clearly visible.</span>
+            </div>
+            <div class="tip-item">
+              <span class="tip-emoji">📄</span>
+              <span>If the form has multiple pages, upload one page at a time.</span>
+            </div>
+            <div class="tip-item">
+              <span class="tip-emoji">✏️</span>
+              <span>After detection, you can review and correct any field names.</span>
+            </div>
+          </div>
+
+          <!-- Language reminder -->
+          <div class="card" style="margin-top: 20px;">
+            <p id="lang-reminder-title" style="font-weight:700; margin-bottom:8px;">🌐 Current Language</p>
+            <p style="color:var(--text-secondary); font-size:0.95rem;">
+              <span id="lang-reminder-prefix">Voice guidance will be in</span> <strong id="lang-reminder" style="color:var(--accent)">English</strong>.
+              <a href="index.html" id="change-lang-link" style="color:var(--text-muted); font-size:0.85rem; display:block; margin-top:6px;">
+                ← Change language
+              </a>
+            </p>
+          </div>
+        </aside>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="toast-container" aria-live="polite" aria-atomic="false"></div>
+
+  <script src="js/api.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/upload.js"></script>
+</body>
+</html>
