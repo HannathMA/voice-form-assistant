@@ -1,7 +1,7 @@
 {
   "name": "voice-form-assistant",
   "version": "1.0.0",
-  "description": "Voice-Based Form Filling Assistant",
+  "description": "Voice-Based Form Filling Assistant with React SPA & Express AI Backend",
   "main": "backend/server.js",
   "scripts": {
     "start": "node backend/server.js",

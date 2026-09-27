@@ -1,7 +1,35 @@
 # 🎙️ Voice-Based Form Filling Assistant
 
-Fill any paper form using your voice — in Malayalam, Hindi, Tamil, Telugu, or English.
-Upload a photo, let AI detect the fields, then answer each question by speaking or typing.
+> **AI-powered voice assistant that turns paper forms into filled digital documents using voice in Indian languages & English.**
+
+Fill any paper or digital form effortlessly using your voice — supporting **Malayalam, Hindi, Tamil, Telugu, and English**. Upload a photo or PDF of a form, let AI detect and translate every field, answer questions naturally with voice or keyboard, and export a pixel-perfect filled document.
+
+---
+
+## ⚡ Key Features
+
+- ⚛️ **Modern React 19 Frontend**: Built with **React 19**, **Vite**, **Lucide Icons**, and responsive desktop/laptop UI architecture.
+- 📸 **Vision AI Field Extraction**: Detects form fields, labels, input types, and coordinate bounding boxes using **Google Gemini Vision AI**.
+- 🗣️ **Multilingual Dual-Layer Voice Engine**:
+  - High-accuracy Text-to-Speech (TTS) & Speech-to-Text (STT) via **Sarvam AI** for Indian languages.
+  - Seamless automatic browser **Web Speech API** fallback if no API key is present.
+- 🎨 **Visual Form Overlay & AI Inpainting**:
+  - Live pixel-perfect text placement directly over the original uploaded form canvas.
+  - AI-assisted filled form generation powered by **OpenAI Image Generation (`gpt-image-1-mini`)**.
+- 💾 **State Persistence**: Real-time progress auto-saving with **MongoDB** and session resumption.
+- 🖨️ **Review & Export**: Interactive review table, inline editing for corrections, and instant Print / PDF export.
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technologies |
+|---|---|
+| **Frontend** | React 19, Vite, Lucide React, Canvas Confetti, Vanilla CSS Tokens |
+| **Backend** | Node.js, Express 4, Mongoose, Multer (Memory Storage) |
+| **AI / ML** | Google Gemini Vision (1.5 Flash), Sarvam AI (Speech), OpenAI (Image Gen) |
+| **Database** | MongoDB / MongoDB Atlas |
+| **Deployment** | Vercel (Native Serverless Functions & Static SPA Hosting) |
 
 ---
 
@@ -9,48 +37,81 @@ Upload a photo, let AI detect the fields, then answer each question by speaking 
 
 ### 1. Prerequisites
 - [Node.js 18+](https://nodejs.org/)
-- [MongoDB](https://www.mongodb.com/try/download/community) running locally **or** a free [MongoDB Atlas](https://cloud.mongodb.com/) cluster
+- [MongoDB](https://www.mongodb.com/try/download/community) locally **or** a free [MongoDB Atlas](https://cloud.mongodb.com/) cluster
 
-### 2. Clone / open the project
-```bash
-cd voice-form-assistant/backend
-```
+### 2. Clone & Install Dependencies
+Clone the repository and install dependencies from the root directory (npm workspaces handles both root, backend, and React frontend):
 
-### 3. Install dependencies
 ```bash
+git clone https://github.com/HannathMA/voice-form-assistant.git
+cd voice-form-assistant
 npm install
 ```
 
-### 4. Configure environment variables
+### 3. Configure Environment Variables
+Copy the example environment file for the backend:
+
 ```bash
-cp .env.example .env
+cp backend/.env.example backend/.env
 ```
-Edit `.env` and fill in your keys:
 
-| Variable | Where to get it |
-|---|---|
-| `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/app/apikey) |
-| `SARVAM_API_KEY` | [Sarvam AI Dashboard](https://dashboard.sarvam.ai) |
-| `MONGODB_URI` | Local: `mongodb://localhost:27017/voice-form-assistant` |
+Open `backend/.env` and provide your keys:
 
-### 5. Start development servers
+```env
+# Google Gemini API (Field Detection)
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# Sarvam AI API (Indian Language TTS & STT)
+SARVAM_API_KEY=your_sarvam_api_key_here
+
+# MongoDB Connection String
+MONGODB_URI=mongodb://localhost:27017/voice-form-assistant
+
+# OpenAI API Key (Optional: Filled Form Inpainting / Generation)
+OPENAI_API_KEY=your_openai_key_here
+
+# Express Server Port
+PORT=5000
+```
+
+*(Optional)* If you run the frontend independently against a remote backend, configure `frontend/.env`:
+```env
+VITE_API_URL=http://localhost:5000
+```
+
+### 4. Start Development Servers
+
+Run both the Express backend and the Vite React frontend:
+
 ```bash
-# Terminal 1: Start backend server (port 5000)
+# Terminal 1: Start Express backend (port 5000)
 npm run dev:backend
 
-# Terminal 2: Start React frontend Vite dev server (port 5173)
+# Terminal 2: Start React frontend with Vite HMR (port 5173)
 npm run dev:frontend
 ```
 
-Or build the production React bundle into `frontend/dist` and `public`:
+Open **`http://localhost:5173`** in your browser to start using the app.
+
+---
+
+## 📦 Production Build & Deployment
+
+To build the React application for production:
+
 ```bash
+# Builds frontend with Vite and copies distribution assets to public/
 npm run build
+
+# Start the unified Express production server
 npm start
 ```
 
-### 6. Open in browser
-- **React Development**: `http://localhost:5173`
-- **Backend / Production**: `http://localhost:5000`
+### Deploying to Vercel
+The repository is pre-configured for zero-config Vercel deployment:
+- `vercel.json` routes `/api/*` to the Express serverless function in `api/index.js`.
+- The static React SPA is served directly from `public/`.
+- Just set your environment variables (`GEMINI_API_KEY`, `SARVAM_API_KEY`, `MONGODB_URI`, `OPENAI_API_KEY`) in your Vercel Project Settings.
 
 ---
 
@@ -58,28 +119,55 @@ npm start
 
 ```
 voice-form-assistant/
-├── frontend/                  ← Modern React SPA (Vite + React 19)
+├── frontend/                     ← Modern React SPA (Vite + React 19)
 │   ├── src/
-│   │   ├── components/        ← Navbar, HomeView, UploadView, FormWizardView, ReviewView, etc.
-│   │   ├── context/           ← AppContext (state management for language, session, toasts)
-│   │   ├── services/          ← api.js (backend fetch) & voice.js (TTS/STT dual-layer)
-│   │   ├── i18n/              ← translations.js (en, ml, hi, ta, te)
-│   │   ├── App.jsx & App.css  ← View orchestrator & styling
-│   │   └── main.jsx & index.css ← Entry point & global tokens
-│   ├── dist/                  ← Production React bundle
-│   └── package.json           ← React dependencies & Vite config
+│   │   ├── components/
+│   │   │   ├── Navbar.jsx        ← Navigation, language picker, progress bar
+│   │   │   ├── HomeView.jsx      ← Hero landing, language selection
+│   │   │   ├── UploadView.jsx    ← Form image upload, sample templates, AI gen prompt
+│   │   │   ├── FormWizardView.jsx← One-by-one voice/text form field filling wizard
+│   │   │   ├── ReviewView.jsx    ← Answers table, form overlay, print & export
+│   │   │   ├── LoadingOverlay.jsx← Processing indicators
+│   │   │   └── ToastContainer.jsx← Notifications & toast alerts
+│   │   ├── context/
+│   │   │   ├── AppContext.jsx    ← Central state (active view, form data, answers)
+│   │   │   └── useApp.js         ← Custom hook for app context
+│   │   ├── services/
+│   │   │   ├── api.js            ← Unified backend API requests
+│   │   │   ├── voice.js          ← Sarvam AI + Web Speech API dual-layer engine
+│   │   │   └── formOverlay.js    ← Pixel-perfect canvas overlay renderer
+│   │   ├── i18n/
+│   │   │   └── translations.js   ← Localized strings (en, ml, hi, ta, te)
+│   │   ├── App.jsx & App.css     ← View router and styled UI system
+│   │   └── main.jsx & index.css  ← React DOM root & design tokens
+│   ├── dist/                     ← Compiled production bundle
+│   ├── vite.config.js            ← Vite config with API proxy
+│   └── package.json              ← React dependencies
 │
-├── public/                    ← Static production distribution
 ├── backend/
-│   ├── server.js              ← Express entry point (serves API & frontend/dist)
-│   ├── config/db.js           ← MongoDB connection
-│   ├── models/                ← Mongoose models (User, Form, Session)
-│   ├── routes/                ← API routes (/api/forms, /api/sessions, /api/voice)
-│   ├── controllers/           ← Route handlers
-│   │   ├── geminiService.js   ← Gemini Vision API
-│   │   └── sarvamService.js   ← Sarvam TTS + STT
+│   ├── server.js                 ← Express entry point & static SPA fallback
+│   ├── config/db.js              ← MongoDB connection logic
+│   ├── models/                   ← Mongoose schemas (Form, Session, User)
+│   ├── routes/
+│   │   ├── formRoutes.js         ← /api/forms (upload, detect, templates, filled-image)
+│   │   ├── sessionRoutes.js      ← /api/sessions (save, resume progress)
+│   │   └── voiceRoutes.js        ← /api/voice (TTS audio synthesis & STT transcription)
+│   ├── controllers/
+│   │   ├── formController.js     ← Form management and image generation
+│   │   ├── sessionController.js  ← Session persistence
+│   │   └── voiceController.js    ← Speech processing
+│   ├── services/
+│   │   ├── geminiService.js      ← Gemini Vision prompt & field parsing
+│   │   ├── sarvamService.js      ← Sarvam REST API integration
+│   │   └── imageGenService.js    ← OpenAI image generation and inpainting
 │   └── middleware/
-│       └── uploadMiddleware.js ← Multer (image + audio)
+│       └── uploadMiddleware.js   ← Multer memory storage (serverless compatible)
+│
+├── api/
+│   └── index.js                  ← Vercel serverless entry point
+├── public/                       ← Production distribution served by Vercel & Express
+├── vercel.json                   ← Serverless rewrite configuration
+└── package.json                  ← Root npm workspace & build scripts
 ```
 
 ---
@@ -87,50 +175,32 @@ voice-form-assistant/
 ## 🔌 API Endpoints
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/forms/upload` | Upload image, detect fields with Gemini |
-| `GET`  | `/api/forms/:id` | Get a saved form |
-| `POST` | `/api/sessions` | Create a new filling session |
-| `PUT`  | `/api/sessions/:id` | Save progress |
-| `GET`  | `/api/sessions/:id` | Resume a session |
-| `POST` | `/api/voice/text-to-speech` | `{text, language}` → audio WAV |
-| `POST` | `/api/voice/speech-to-text` | Audio file → `{transcript}` |
+|---|---|---|
+| `POST` | `/api/forms/upload` | Upload form image and detect fields with Gemini Vision |
+| `GET` | `/api/forms/:id` | Retrieve saved form structure and fields |
+| `GET` | `/api/forms/templates` | List pre-configured demo form templates |
+| `POST` | `/api/forms/generate-image` | Generate a synthetic form template with OpenAI |
+| `POST` | `/api/forms/generate-filled-form` | Generate filled form image with user answers |
+| `POST` | `/api/sessions` | Create a new form-filling session |
+| `PUT` | `/api/sessions/:id` | Update and auto-save filled answers |
+| `GET` | `/api/sessions/:id` | Retrieve existing session to resume |
+| `POST` | `/api/voice/text-to-speech` | Synthesize speech audio in selected Indian language |
+| `POST` | `/api/voice/speech-to-text` | Transcribe voice recording into text |
 
 ---
 
 ## 🌐 Supported Languages
 
-| Code | Language |
-|------|----------|
-| `en` | English |
-| `ml` | Malayalam (മലയാളം) |
-| `hi` | Hindi (हिन्दी) |
-| `ta` | Tamil (தமிழ்) |
-| `te` | Telugu (తెలుగు) |
+| Code | Language | Native Name | TTS / STT Support |
+|---|---|---|---|
+| `en` | English | English | ✅ Sarvam AI & Web Speech |
+| `ml` | Malayalam | മലയാളം | ✅ Sarvam AI & Web Speech |
+| `hi` | Hindi | हिन्दी | ✅ Sarvam AI & Web Speech |
+| `ta` | Tamil | தமிழ் | ✅ Sarvam AI & Web Speech |
+| `te` | Telugu | తెలుగు | ✅ Sarvam AI & Web Speech |
 
 ---
 
-## 🛡️ Security Notes
+## 🛡️ License
 
-- API keys are **only** in `backend/.env` — never in frontend JS
-- The `.env` file is gitignored
-- Uploaded images are stored locally in `backend/uploads/`
-- In production: add authentication, restrict CORS origin, use HTTPS
-
----
-
-## 🧪 How It Works
-
-1. **Home** — User selects their language. Saved to `localStorage`.
-2. **Upload** — Drag-and-drop a form photo → sent to Express → Gemini Vision detects fields.
-3. **Form** — One field at a time. Click 🔊 to hear the question, 🎙️ to speak, or type. Auto-saves to MongoDB.
-4. **Review** — See all answers in a table. Click Edit to fix any field. Print / Save as PDF.
-
----
-
-## ✅ Without API Keys
-
-The app is still navigable without keys:
-- **No Gemini key** → Upload still works; returns 2 placeholder fields (Full Name, Date of Birth).
-- **No Sarvam key** → Voice buttons fall back to browser Web Speech API (Chrome only).
-- **No MongoDB** → Server won't start; use a local MongoDB instance.
+MIT License. Contributions and feedback are welcome!
